@@ -1,0 +1,82 @@
+```cpp
+#include <WiFi.h>
+#include <WebServer.h>
+
+const char* ssid = "your_ssid";
+const char* password = "your_password";
+
+WebServer server(80);
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<title>Arduino Serial Terminal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: monospace; background: #121212; color: #00ff00; padding: 20px; }
+#log { background: #000; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #333; margin-bottom: 10px; }
+input, button { font-family: monospace; padding: 10px; font-size: 16px; }
+input { width: 70%; background: #222; color: #fff; border: 1px solid #444; }
+button { width: 25%; background: #00aa00; color: #000; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>Web Serial Terminal</h2>
+<div id="log"></div>
+<input type="text" id="msg" placeholder="Type text here..." autofocus>
+<button onclick="sendText()">Send</button>
+<script>
+function sendText() {
+let val = document.getElementById('msg').value;
+fetch('/send?msg=' + encodeURIComponent(val));
+document.getElementById('msg').value = '';
+}
+setInterval(() => {
+fetch('/read').then(res => res.text()).then(data => {
+if(data) { document.getElementById('log').innerHTML += data + '<br>'; }
+});
+}, 1000);
+</script>
+</body>
+</html>
+)rawliteral";
+
+void handleRoot() {
+server.send(200, "text/html", index_html);
+}
+
+void handleSend() {
+if (server.hasArg("msg")) {
+String msg = server.arg("msg");
+Serial.println(msg);
+}
+server.send(200, "text/plain", "OK");
+}
+
+void handleRead() {
+if (Serial.available()) {
+String incoming = Serial.readStringUntil('
+');
+server.send(200, "text/plain", incoming);
+} else {
+server.send(200, "text/plain", "");
+}
+}
+
+void setup() {
+Serial.begin(115200);
+WiFi.begin(ssid, password);
+while (WiFi.status() != WL_CONNECTED) {
+delay(500);
+}
+server.on("/", handleRoot);
+server.on("/send", handleSend);
+server.on("/read", handleRead);
+server.begin();
+}
+
+void loop() {
+server.handleClient();
+}
+```
