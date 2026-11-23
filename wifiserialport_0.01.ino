@@ -66,6 +66,7 @@ or possibly just have it ask for a password when bt initially connecting, and th
                                 //   traffice from serial2 is passed along to all three clients, input from any client is passed on to serial2
 #include "btserial.h"           // bluetooth serial
 #include "web.h"                // WiFi web setup, FS, HTTP server, including a web page text terminal interface for the serial port
+#include "fancontroller.h"      // SHT31 temperature-based fan controller
 
 
 
@@ -88,6 +89,7 @@ void setup() {
   SerialQ_begin();                                                                              // initialize Serial port - main USB serial
   Serial2Q_begin();                                                                             // initialize Serial2 port - port connected to target router/computer console
   if (!LittleFS.begin(true)) Serial.println("An error has occurred while mounting LittleFS");   // Initialize LittleFS
+  fanController.begin();  // initialize SHT31, tachometer, and fan PWM
 
 #ifdef BTSER_H
   btser.begin();                                                                                // initialize BLE Bluetooth Low Energy serial port object
@@ -127,6 +129,7 @@ void loop() {
 #ifdef WEB_H
     web.loop();
 #endif
+  fanController.loop();  // temperature control and tachometer sampling
  
   loopTimer = millis();
 
