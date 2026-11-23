@@ -140,7 +140,7 @@ void loop() {
   }
 
 
-  delay(10);    // yield to RTOS and background processes
+  yield();    // yield to RTOS and background processes
 }
 
 //

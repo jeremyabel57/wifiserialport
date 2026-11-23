@@ -202,7 +202,7 @@ void websrvc::root(AsyncWebServerRequest* request) {
     </style>
   </head>
   <body>
-    <h2>📟 ESP32 Web Serial Terminal (Real-Time)</h2>
+    <h2> ESP32 Web Serial Terminal (Real-Time)</h2>
     <div class="links-container">
       MCU configuration: &nbsp;
       <a href="/setup" target="_blank" class="custom-link">setup</a>
@@ -242,7 +242,7 @@ void websrvc::root(AsyncWebServerRequest* request) {
       function initWebSocket() {
         logSystem("Connecting to ESP32 WebSocket...");
         socket = new WebSocket(wsUrl);
-        socket.onopen = () => logSystem("⚡ Connection established!");
+        socket.onopen = () => logSystem("Connection established!");
         socket.onmessage = (event) => {
           // Handle stream data character by character or word fragments instantly
           for (let i = 0; i < event.data.length; i++) {
@@ -250,7 +250,7 @@ void websrvc::root(AsyncWebServerRequest* request) {
           }
         };
         socket.onclose = () => {
-          logSystem("❌ Connection lost. Reconnecting in 3 seconds...");
+          logSystem("Connection lost. Reconnecting in 3 seconds...");
           setTimeout(initWebSocket, 3000);
         };
       }

@@ -1,4 +1,69 @@
 /*
+wifi bt serial port
+
+pinout
+UART2 TX GP6 -> TR3000 UART console RX
+UART2 RX GP5 -> TR3000 UART console TX
+
+GP1 SDA -> thermometer
+GP2 SCL -> thermometer
+
+GP7 PWM out -> level shifter -> blue PWM
+GP4 PCNT in -> level shifter -> yellow tach
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 
 Pinouts
 
