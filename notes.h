@@ -2,8 +2,8 @@
 wifi bt serial port
 
 pinout
-UART2 TX GP6 -> TR3000 UART console RX
-UART2 RX GP5 -> TR3000 UART console TX
+UART2 RX GP6 -> TR3000 UART console TX
+UART2 TX GP5 -> TR3000 UART console RX
 
 GP1 SDA -> thermometer
 GP2 SCL -> thermometer

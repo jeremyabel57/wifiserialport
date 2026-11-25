@@ -127,6 +127,7 @@ void loop() {
   sertie.loop();                // serial tie together handler
 #endif
 #ifdef WEB_H
+  webser.loop();                // broadcast queued serial output
   web.loop();
 #endif
   fanController.loop();  // temperature control and tachometer sampling

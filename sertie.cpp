@@ -36,10 +36,10 @@ void sertiec::loop() {
       char c = SERIAL2Q.read();               // read it
       SERIALQ.write(c);                       // send a copy to the usb serial
 #ifdef BTSER_H
-      if (btser.connected) btser.write(c);    // send a copy to the bluetooth ble serial
+      if (btser.connected.load()) btser.write(c);  // send a copy to the Bluetooth BLE client
 #endif
 #ifdef WEB_H
-      if (webser.connected) webser.write(c);  // send a copy to the web terminal
+      webser.write(c);                        // broadcast a copy to connected web terminals
 #endif
     }
     if (SERIALQ.available()) SERIAL2Q.write(SERIALQ.read());    // if traffic from Serial (usb), then send it to Serial2

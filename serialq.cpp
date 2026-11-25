@@ -10,7 +10,7 @@
 
 
 void SerialQ_begin() {
-  Serial.begin(115200);               // UART / Serial
+  Serial.begin(115200); //, SERIAL_8N1);   // UART / Serial
   SerialQ.begin(&Serial, 256, 256);   // initialize the serial queue/buffer with 1024 byte input and 1024 byte output buffers
 }
 
@@ -27,7 +27,7 @@ void SerialQc::begin(Stream *s1, uint16_t bin, uint16_t bout) {
   qout.begin(bout);
 }
 void SerialQc::loop() {
-  for (uint8_t i = 2; i > 0; i--) {                           // trying two character output per loop cycle to give faster serial
+  for (uint16_t i = 1024; i > 0; i--) {                           // trying two character output per loop cycle to give faster serial
     if (s_available() && (!qin.full())) {
       qin.push(s_read());
     }

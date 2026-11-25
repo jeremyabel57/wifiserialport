@@ -58,7 +58,10 @@ void websrvc::begin() {
   ws->onEvent(onWsEvent);
   server->addHandler(ws);
 
-
+  if (!webser.begin()) {
+    Serial.println(F("Failed to allocate web serial receive queue"));
+    abort();
+  }
 
   server->enableFsCodeEditor();                                           // Enable ACE FS file web editor and add FS info callback function
   server->init();                                                         // Start AsyncFsWebServer
@@ -330,10 +333,13 @@ void websrvc::setOpt(const char *lbl, char *val) {                          // s
 void websrvc::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
                void *arg, uint8_t *data, size_t len) {
     if (type == WS_EVT_DATA) {
-        AwsFrameInfo *info = (AwsFrameInfo*)arg;
-        if (info->opcode == WS_TEXT) {
-            // Write chunks/characters directly to the serial monitor without waiting for full lines
-            webser.write(data, len);
+        AwsFrameInfo *info = static_cast<AwsFrameInfo *>(arg);
+        if (info && info->message_opcode == WS_TEXT) {
+            size_t received = webser.receive(data, len);
+            if (received < len) {
+                Serial.printf("Web serial RX queue full; dropped %u byte(s)\n",
+                              static_cast<unsigned>(len - received));
+            }
         }
     }
 }
@@ -357,32 +363,43 @@ void websrvc::loop_1s() {
 
 
 
-uint16_t webserc::s_available() {       // we don't poll the web terminal, so if we try directly check the 'port' for data, return 0 - nothing available
-  return 0;                             // the websocket functions will fill in the receive queue when the web terminal sends us data
-}
-char webserc::s_read() {                // we don't poll the web terminal, so any server side reads return null
-  return 0;
-}
-
-
-
-
 void webserc::s_write(char c) {         // send a character to the web terminal
-  if (!connected) return;
-  web.ws->textAll(&c,1);                // send the single character to the web terminal
+  if (web.ws) web.ws->textAll(&c, 1);
 }
 
+
+bool webserc::begin() {
+  SerialQc::begin(nullptr, 0, 256);
+  rxQueue = xQueueCreate(1024, sizeof(uint8_t));
+  return rxQueue != nullptr;
+}
+
+size_t webserc::receive(const uint8_t *data, size_t len) {
+  if (!rxQueue || (!data && len)) return 0;
+
+  size_t received = 0;
+  while (received < len &&
+         xQueueSend(rxQueue, data + received, 0) == pdTRUE) {
+    received++;
+  }
+  return received;
+}
+
+uint16_t webserc::available() {
+  return rxQueue ? static_cast<uint16_t>(uxQueueMessagesWaiting(rxQueue)) : 0;
+}
+
+char webserc::read() {
+  uint8_t value;
+  if (!rxQueue || xQueueReceive(rxQueue, &value, 0) != pdTRUE) return 0;
+  return static_cast<char>(value);
+}
 
 
 void webserc::loop() {  
-  if (connected) {
-    uint16_t n = qout.available();        // send any data from the queue to the web socket
-    if (n > 0) {
-      uint8_t buf[n];
-      n = qout.read((char*)buf,n);   
-      if (n > 0) web.ws->textAll(buf, n);  // Send the raw character chunk directly to the web socket instantly
-    }
-  }
+  char buf[256];
+  uint16_t n = qout.read(buf, static_cast<uint16_t>(sizeof(buf)));
+  if (n && web.ws) web.ws->textAll(buf, n);
 }
 
 

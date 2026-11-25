@@ -16,19 +16,22 @@
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      btser.connected = true;
+      btser.connected.store(true);
     };
     void onDisconnect(BLEServer* pServer) {
-      btser.connected = false;
+      btser.disconnected();
     }
 };
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      String rxValue = pCharacteristic->getValue();
+      auto rxValue = pCharacteristic->getValue();
       if (rxValue.length() > 0) {
-        for (int i = 0; i < rxValue.length(); i++) {
-          btser.write(rxValue[i]);     // push bytes received into the receive queue
+        size_t received = btser.receive(
+            reinterpret_cast<const uint8_t *>(rxValue.c_str()), rxValue.length());
+        if (received < rxValue.length()) {
+          Serial.printf("Bluetooth serial RX queue full; dropped %u byte(s)\n",
+                        static_cast<unsigned>(rxValue.length() - received));
         }
       }
     }
@@ -38,18 +41,13 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 
 
 
-uint16_t btserc::s_available() {      // check if there is data from the hw bluetooth serial port - always return 0 here.  We will push characters into the queue from other functions
-  return 0;
-}
-char btserc::s_read() {               // read a character from the bluetooth serial port, this function should not be used.  we will push characters into the queue from other functions
-  return 0;                           // characters are pushed into the queue via the bt ble functions
-}
+
 
 
 
 
 void btserc::s_write(char c) {         // the program should not need to use this function, it is just here because.  send a character to the bluetooth serial port
-  if (connected) {
+  if (connected.load()) {
     pTxCharacteristic->setValue(c);
     pTxCharacteristic->notify();
   }
@@ -58,6 +56,13 @@ void btserc::s_write(char c) {         // the program should not need to use thi
 
 
 void btserc::begin() {
+  SerialQc::begin(nullptr, 0, 256);
+  rxQueue = xQueueCreate(1024, sizeof(uint8_t));
+  if (!rxQueue) {
+    Serial.println(F("Failed to allocate Bluetooth serial receive queue"));
+    abort();
+  }
+
   BLEDevice::init("ESP32S3_Serial");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -69,7 +74,7 @@ void btserc::begin() {
   pTxCharacteristic->addDescriptor(new BLE2902());
   BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
       CHARACTERISTIC_UUID_RX,
-      BLECharacteristic::PROPERTY_WRITE
+      BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
                                          );
   pRxCharacteristic->setCallbacks(new MyCallbacks());
   pService->start();
@@ -79,26 +84,57 @@ void btserc::begin() {
 
 
 void btserc::loop() {
-  if (!connected && oldconnected) {
-    mdelay(500);
-    pServer->startAdvertising();
+  if (clearQueuesPending.exchange(false)) {
+    qout.clear();
   }
-  oldconnected = connected;
 
-  if (connected) {
-  	uint16_t chunk = qout.available();
-    while (chunk > 0) {
-  	  if (chunk > 20) chunk = 20; // Safe BLE MTU limit
-  	
-  	  uint8_t buf[chunk];
-  	  chunk = qout.read((char*)buf, chunk);
-  	  if (chunk > 0) {
-  	    pTxCharacteristic->setValue(buf, chunk);
-  	    pTxCharacteristic->notify();
-      }
-  	  chunk = qout.available();
-    }
+  if (!connected.load()) {
+    if (oldconnected && pServer) pServer->startAdvertising();
+    oldconnected = false;
+    return;
   }
+  oldconnected = true;
+
+  uint8_t buf[20];  // Default BLE ATT MTU leaves 20 bytes for characteristic data.
+  while (connected.load() && !qout.empty()) {
+    uint16_t count = 0;
+    while (count < sizeof(buf) && !qout.empty()) {
+      buf[count++] = static_cast<uint8_t>(qout.pull());
+    }
+    pTxCharacteristic->setValue(buf, count);
+    pTxCharacteristic->notify();
+  }
+}
+
+void btserc::disconnected() {
+  connected.store(false);
+  if (rxQueue) xQueueReset(rxQueue);
+  clearQueuesPending.store(true);
+}
+
+size_t btserc::receive(const uint8_t *data, size_t len) {
+  if (!connected.load() || !rxQueue || (!data && len)) return 0;
+
+  size_t received = 0;
+  while (received < len &&
+         xQueueSend(rxQueue, data + received, 0) == pdTRUE) {
+    received++;
+  }
+  return received;
+}
+
+uint16_t btserc::available() {
+  if (!connected.load() || !rxQueue) return 0;
+  return static_cast<uint16_t>(uxQueueMessagesWaiting(rxQueue));
+}
+
+char btserc::read() {
+  uint8_t value;
+  if (!connected.load() || !rxQueue ||
+      xQueueReceive(rxQueue, &value, 0) != pdTRUE) {
+    return 0;
+  }
+  return static_cast<char>(value);
 }
 
 

@@ -24,6 +24,8 @@
 #include <Arduino.h>                            // arduino
 #include "serialq.h"                            // queue buffer for serial stream
 #include <string.h>                             // strings
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 #include <FS.h>                                 // AsyncFsWebServer (in place of ESP Essentials)
 #include <LittleFS.h>                           // LittleFS
@@ -52,13 +54,16 @@ class webreq {
 class webserc : public SerialQc {
  protected:
 
-    uint16_t s_available();     // check if there is data from the web terminal
+    QueueHandle_t rxQueue = nullptr;
+
     void s_write(char);         // send a character to the web terminal
-    char s_read();              // read a character from the web terminal
 
   public:
 
-    bool connected = false;     // is web terminal connected / online
+    bool begin();
+    size_t receive(const uint8_t *data, size_t len);
+    uint16_t available();
+    char read();
 
     void loop();                // run in loop to respond to serial input
 } ;

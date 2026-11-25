@@ -15,6 +15,9 @@
 
 #include <inttypes.h>       //
 #include <Arduino.h>        //
+#include <atomic>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 #include "general.h"        // misc functions
 #include "serialq.h"        // serial queue
@@ -30,20 +33,23 @@ class btserc : public SerialQc {
 
   protected:
 
-    uint16_t s_available();     // check if there is data from the bluetooth serial port
     void s_write(char);         // send a character to the bluetooth serial port
-    char s_read();              // read a character from the bluetooth serial port
+    QueueHandle_t rxQueue = nullptr;
+    std::atomic<bool> clearQueuesPending{false};
 
   public:
 
     BLEServer *pServer = NULL;
-    BLECharacteristic *pTxCharacteristic;
-    bool connected = false;
+    BLECharacteristic *pTxCharacteristic = nullptr;
+    std::atomic<bool> connected{false};
     bool oldconnected = false;
-    uint8_t txValue = 0;
 
     void begin();               // initialize (setup)
     void loop();                // run in loop to respond to serial input
+    void disconnected();
+    size_t receive(const uint8_t *data, size_t len);
+    uint16_t available();
+    char read();
 
 };
 
