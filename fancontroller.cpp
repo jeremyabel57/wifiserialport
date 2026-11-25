@@ -74,19 +74,11 @@ bool FanController::begin() {
   tachConfig.counter_h_lim = 32767;
   tachConfig.counter_l_lim = 0;
 
-  esp_err_t tachError = pcnt_unit_config(&tachConfig);
-  if (tachError == ESP_OK) {
-    tachError = pcnt_set_filter_value(TachPcntUnit, 1000);
-  }
-  if (tachError == ESP_OK) {
-    tachError = pcnt_filter_enable(TachPcntUnit);
-  }
-  if (tachError == ESP_OK) {
-    tachError = pcnt_counter_clear(TachPcntUnit);
-  }
-  if (tachError == ESP_OK) {
-    tachError = pcnt_counter_resume(TachPcntUnit);
-  }
+  esp_err_t                tachError = pcnt_unit_config(&tachConfig);
+  if (tachError == ESP_OK) tachError = pcnt_set_filter_value(TachPcntUnit, 1000);
+  if (tachError == ESP_OK) tachError = pcnt_filter_enable(TachPcntUnit);
+  if (tachError == ESP_OK) tachError = pcnt_counter_clear(TachPcntUnit);
+  if (tachError == ESP_OK) tachError = pcnt_counter_resume(TachPcntUnit);
   tachReady = tachError == ESP_OK;
   if (!tachReady) {
     Serial.printf("Fan controller: unable to configure tachometer PCNT (%d)\n", tachError);
@@ -99,9 +91,7 @@ bool FanController::begin() {
 
 void FanController::loop() {
   const unsigned long now = millis();
-  if (now - lastSampleMs < SampleIntervalMs) {
-    return;
-  }
+  if (now - lastSampleMs < SampleIntervalMs) return;
 
   const unsigned long elapsedMs = now - lastSampleMs;
   lastSampleMs = now;
@@ -163,21 +153,15 @@ bool FanController::setCurve(const CurvePoint *points, size_t count) {
 }
 
 void FanController::setTachPulsesPerRevolution(uint8_t pulses) {
-  if (pulses > 0) {
-    tachPulsesPerRevolution = pulses;
-  }
+  if (pulses > 0) tachPulsesPerRevolution = pulses;
 }
 
 void FanController::setFanSpeedPercent(float percent) {
-  if (!isfinite(percent)) {
-    return;
-  }
+  if (!isfinite(percent)) return;
   if (percent < 0.0f) percent = 0.0f;
   if (percent > 100.0f) percent = 100.0f;
   currentFanSpeedPercent = percent;
-  if (!pwmReady) {
-    return;
-  }
+  if (!pwmReady) return;
 
   const uint32_t maxDuty = (1UL << PwmResolution) - 1;
   const uint32_t duty = (uint32_t)lroundf(percent * maxDuty / 100.0f);
@@ -205,12 +189,8 @@ float FanController::fanSpeedPercent() const {
 }
 
 float FanController::pwmForTemperature(float temperature) const {
-  if (temperature <= curve[0].temperatureC) {
-    return curve[0].pwmPercent;
-  }
-  if (temperature >= curve[curveCount - 1].temperatureC) {
-    return curve[curveCount - 1].pwmPercent;
-  }
+  if (temperature <= curve[0].temperatureC) return curve[0].pwmPercent;
+  if (temperature >= curve[curveCount - 1].temperatureC) return curve[curveCount - 1].pwmPercent;
 
   for (size_t i = 1; i < curveCount; ++i) {
     if (temperature <= curve[i].temperatureC) {

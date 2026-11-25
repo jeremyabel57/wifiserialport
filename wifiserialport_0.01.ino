@@ -127,7 +127,7 @@ void loop() {
   sertie.loop();                // serial tie together handler
 #endif
 #ifdef WEB_H
-    web.loop();
+  web.loop();
 #endif
   fanController.loop();  // temperature control and tachometer sampling
  
