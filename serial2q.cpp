@@ -24,7 +24,7 @@ class SerialQc Serial2Q;
 
 void Serial2Q_begin() {
   Serial2.begin(115200, SERIAL_8N1, SERIAL2_RX2_PIN, SERIAL2_TX2_PIN);      // UART connected to the computer console, target of the pass thru
-  Serial2Q.begin(&Serial2, 256, 256);
+  Serial2Q.begin(&Serial2, 2048, 2048);
 }
 
 

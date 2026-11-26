@@ -11,7 +11,7 @@
 
 void SerialQ_begin() {
   Serial.begin(115200); //, SERIAL_8N1);   // UART / Serial
-  SerialQ.begin(&Serial, 256, 256);   // initialize the serial queue/buffer with 1024 byte input and 1024 byte output buffers
+  SerialQ.begin(&Serial, 2048, 2048);   // initialize with 2048-byte input and output buffers
 }
 
 

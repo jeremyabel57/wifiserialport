@@ -57,7 +57,7 @@ void btserc::s_write(char c) {         // the program should not need to use thi
 
 void btserc::begin() {
   SerialQc::begin(nullptr, 0, 256);
-  rxQueue = xQueueCreate(1024, sizeof(uint8_t));
+  rxQueue = xQueueCreate(2048, sizeof(uint8_t));
   if (!rxQueue) {
     Serial.println(F("Failed to allocate Bluetooth serial receive queue"));
     abort();

@@ -370,7 +370,7 @@ void webserc::s_write(char c) {         // send a character to the web terminal
 
 bool webserc::begin() {
   SerialQc::begin(nullptr, 0, 256);
-  rxQueue = xQueueCreate(1024, sizeof(uint8_t));
+  rxQueue = xQueueCreate(2048, sizeof(uint8_t));
   return rxQueue != nullptr;
 }
 
