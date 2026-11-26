@@ -104,8 +104,8 @@ uint16_t SerialQc::read(char *buf, uint16_t len) {
   return read((uint8_t*) buf, len);
 }
 uint16_t SerialQc::read(uint8_t *b, uint16_t n) {
-  uint16_t i=0;
-  while ((i<n) && (available()))
+  uint16_t i = 0;
+  while ((i < n) && (available()))
     b[i++] = (uint8_t) read();
   return i;
 }

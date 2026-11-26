@@ -3,12 +3,6 @@
 
 
 /*
-   Todo:
-   . add web page to set wakeme and monitor wakeme variable.  wakeme="" for inert.  wakeme=hostname of thermo or rtc host to keep awake.  the next time the host uploads data, it is told to toggle sleep_en, and wakeme is erased.
-   . validate time sync
-   . validate /dstore web interface
-   . validate web pages
-   . test host mode data storage and reporting /tdata.html file / web page report
 */
 
 
@@ -52,7 +46,7 @@ class webreq {
 
 // serial queue buffer for web serial stream
 class webserc : public SerialQc {
- protected:
+  protected:
 
     QueueHandle_t rxQueue = nullptr;
 

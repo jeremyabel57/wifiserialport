@@ -7,8 +7,8 @@
 
 /*
 
-sertie.begin(); 	// setup
-sertie.loop();	  // interface with host thru usb/primary uart
+  sertie.begin(); 	// setup
+  sertie.loop();	  // interface with host thru usb/primary uart
 
 
 */
@@ -18,10 +18,10 @@ sertie.loop();	  // interface with host thru usb/primary uart
 
 class sertiec {
 
-public:
+  public:
 
-  void begin();               // initialize (setup)
-  void loop();                // run in loop to respond to serial input
+    void begin();               // initialize (setup)
+    void loop();                // run in loop to respond to serial input
 
 };
 

@@ -12,10 +12,10 @@
 
 // global configuration variable.  stored in flash
 class config {
-public:
-                                // option name          default                     description
-  String name;                  // hostname             "new"                       device name.  used for web site
-  
+  public:
+    // option name          default                     description
+    String name;                  // hostname             "new"                       device name.  used for web site
+
 };
 
 #ifndef CONFIG_C

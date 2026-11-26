@@ -150,17 +150,17 @@ char webserc::s_read() {                // we don't poll the web terminal, so an
 
 void webserc::s_write(char c) {         // send a character to the web terminal
   if (!connected) return;
-  web.ws->textAll(&c,1);                // send the single character to the web terminal
+  web.ws->textAll(&c, 1);               // send the single character to the web terminal
 }
 
 
 
-void webserc::loop() {  
+void webserc::loop() {
   if (connected) {
     uint16_t n = qout.available();        // send any data from the queue to the web socket
     if (n > 0) {
       uint8_t buf[n];
-      n = qout.read((char*)buf,n);   
+      n = qout.read((char*)buf, n);
       if (n > 0) web.ws->textAll(buf, n);  // Send the raw character chunk directly to the web socket instantly
     }
   }
@@ -181,17 +181,28 @@ bool webreq::send(const char *url) {
   if (request.readyState() == readyStateUnsent || request.readyState() == readyStateDone) {
     if (request.open("GET", url)) {
       request.send();
-      processed=false;
+      processed = false;
       return true;
     }
   }
   return false;
 }
 
-bool webreq::received() { if (!processed) if (request.readyState()==readyStateDone) { processed=true; return true;}  return false; }          // true if http request complete - response received
-bool webreq::pending() { return (request.readyState() != readyStateUnsent) && (request.readyState() != readyStateDone); }                     // true if http request is pending
-String webreq::responseText() { return request.responseText(); }                                                                              // text of http response
-char *webreq::respHeaderValue(const char *var) { return request.respHeaderValue(var); }                                                       // return value of a given header from response
+bool webreq::received() {
+  if (!processed) if (request.readyState() == readyStateDone) {
+      processed = true;  // true if http request complete - response received
+      return true;
+    }  return false;
+}
+bool webreq::pending() {
+  return (request.readyState() != readyStateUnsent) && (request.readyState() != readyStateDone);  // true if http request is pending
+}
+String webreq::responseText() {
+  return request.responseText();  // text of http response
+}
+char *webreq::respHeaderValue(const char *var) {
+  return request.respHeaderValue(var);  // return value of a given header from response
+}
 
 
 

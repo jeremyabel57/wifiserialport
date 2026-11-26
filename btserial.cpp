@@ -28,7 +28,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       auto rxValue = pCharacteristic->getValue();
       if (rxValue.length() > 0) {
         size_t received = btser.receive(
-            reinterpret_cast<const uint8_t *>(rxValue.c_str()), rxValue.length());
+                            reinterpret_cast<const uint8_t *>(rxValue.c_str()), rxValue.length());
         if (received < rxValue.length()) {
           Serial.printf("Bluetooth serial RX queue full; dropped %u byte(s)\n",
                         static_cast<unsigned>(rxValue.length() - received));

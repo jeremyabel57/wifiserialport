@@ -1,15 +1,15 @@
 /*
-wifi bt serial port
+  wifi bt serial port
 
-pinout
-UART2 RX GP6 -> TR3000 UART console TX
-UART2 TX GP5 -> TR3000 UART console RX
+  pinout
+  UART2 RX GP6 -> TR3000 UART console TX
+  UART2 TX GP5 -> TR3000 UART console RX
 
-GP1 SDA -> thermometer
-GP2 SCL -> thermometer
+  GP1 SDA -> thermometer
+  GP2 SCL -> thermometer
 
-GP7 PWM out -> level shifter -> blue PWM
-GP4 PCNT in -> level shifter -> yellow tach
+  GP7 PWM out -> level shifter -> blue PWM
+  GP4 PCNT in -> level shifter -> yellow tach
 
 
 
@@ -65,32 +65,32 @@ GP4 PCNT in -> level shifter -> yellow tach
 
 /*
 
-Pinouts
+  Pinouts
 
-gfclock: esp32s3 supermini
-LED/RGB LED = 48
-I2S        I2C
-LR/WS=5    SDA=8
-BCLK=4     SCL=9
-DIN=1      BME280
-SD/EN=3	
-PCA98357
+  gfclock: esp32s3 supermini
+  LED/RGB LED = 48
+  I2S        I2C
+  LR/WS=5    SDA=8
+  BCLK=4     SCL=9
+  DIN=1      BME280
+  SD/EN=3
+  PCA98357
 
-nethost/server: esp32c3 mini
-LED (blue)=8 low=on
-SD/TF card
-SCK=4
-MISO=5
-MOSI=6
-CS=7
+  nethost/server: esp32c3 mini
+  LED (blue)=8 low=on
+  SD/TF card
+  SCK=4
+  MISO=5
+  MOSI=6
+  CS=7
 
-thermometer: esp32c3 xiao 
-LED (blue)=8 low=on
-I2C
-scl=7=d5
-sda=6=d4
-BME280  Temperature Humidity Pressure sensor
-INA226  Current, Voltage sensor to monitor solar power
+  thermometer: esp32c3 xiao
+  LED (blue)=8 low=on
+  I2C
+  scl=7=d5
+  sda=6=d4
+  BME280  Temperature Humidity Pressure sensor
+  INA226  Current, Voltage sensor to monitor solar power
 
 */
 
@@ -101,29 +101,29 @@ INA226  Current, Voltage sensor to monitor solar power
 /*
 
 
-to do
-/ rename project to something like lanthermometer or something
-\ add serial port function to read/write data store variables
+  to do
+  / rename project to something like lanthermometer or something
+  \ add serial port function to read/write data store variables
   v var=val
-/ change gfclock bell frequency to once per hour and use hour mod 12 for the bell count
-/ change esp sleep to a period of 5 minutes with a wake at 10 seconds before the
+  / change gfclock bell frequency to once per hour and use hour mod 12 for the bell count
+  / change esp sleep to a period of 5 minutes with a wake at 10 seconds before the
   top of the 5 minute mark
-- add sd card functions, probably sdfat
-\ add web get function for both http and https
+  - add sd card functions, probably sdfat
+  \ add web get function for both http and https
   \ add weather underground upload function
   - may need to download wunderground https/ssl certs, or have the code ignore the certs
-/ rtc date/time
+  / rtc date/time
   / use ds3231 chip if available
   / if ds3231 not available, then use onboard rtc circuit
   / add ESP32Time library functions to keep internal rtc updated
   / if in server or default mode, then use internet ntp (once per day) to keep rtc in sync
-\ add web based function to read/write variables in datastore 
+  \ add web based function to read/write variables in datastore
   \ if sleep variable updated, then update espsleep class instance variable as well
-/ more config for datastore
+  / more config for datastore
   / host_server= ip address of host server
   / board= board type (esp32c3 xiao, esp32s3 supermini, esp32c3 supermini)
-\ ina226 module code
-. add mode variable to dsstore
+  \ ina226 module code
+  . add mode variable to dsstore
   - default mode is to stay awake and just sit on the network and be available
   \ gfclock mode (10.0.0.74)
     \ bells on the hour
@@ -157,15 +157,15 @@ to do
 	    . store file in sd flash
 		. upload when client mcu is awake
 		. dont forget to restore sleep mode of client mcu
-	
-	
 
-/ change ds3231.h file to rtctime.h  and add functions to use internal rtc.  use a flag to 
+
+
+  / change ds3231.h file to rtctime.h  and add functions to use internal rtc.  use a flag to
     follow ds3231 if available or use internal.  either way, keep both up to date
 
 
 
-#
+  #
 
 */
 

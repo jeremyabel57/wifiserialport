@@ -4,10 +4,10 @@
 
 
 /*
-void Serial2Qc::begin(Stream *s1, uint16_t bin, uint16_t bout) {
+  void Serial2Qc::begin(Stream *s1, uint16_t bin, uint16_t bout) {
   SerialQc::begin(s1, bin, bout);       // initialize the base/inherited class items
   s1->begin(115200, SERIAL_8N1, SERIAL2_RX2_PIN, SERIAL2_TX2_PIN);      // UART connected to the computer console, target of the pass thru
-}
+  }
 */
 
 

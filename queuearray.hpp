@@ -4,7 +4,7 @@
   DataType = data type
   IndexType = index type (uint8_t for max queue size of 254 items, uint16_t for max 65535, etc...)
 
-functions:
+  functions:
   constructor([len]): len = size of queue.
   begin([len]): len = size of queue.  clear queue
   clear: empty the queue
@@ -19,7 +19,7 @@ functions:
     if item is not given, then restore previous item that was there
   available: return the number of items currently stored in the queue
   space: return the number of items that can be added to make the queue full
-  
+
 */
 
 
@@ -100,13 +100,13 @@ template<typename DataType, typename IndexType> IndexType QueueArray<DataType, I
 }
 template<typename DataType, typename IndexType> IndexType QueueArray<DataType, IndexType>::read(DataType *buf, IndexType len) {
   IndexType i = 0;
-  while ((i<len) && (!empty()))
+  while ((i < len) && (!empty()))
     buf[i++] = pull();
   return i;
 }
 template<typename DataType, typename IndexType> IndexType QueueArray<DataType, IndexType>::write(const DataType *buf, IndexType len) {
   IndexType i = 0;
-  while ((i<len) && (!full()))
+  while ((i < len) && (!full()))
     push(buf[i++]);
   return i;
 }
