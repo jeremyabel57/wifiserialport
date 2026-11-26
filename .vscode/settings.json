@@ -66,5 +66,11 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\person\\Documents\\vs\\wifiserialport\\build"
+  ],
+  "arduino.useArduinoCli": true,
+  "arduino.path": "",
+  "arduino.commandPath": "",
+  "arduino.additionalUrls": [
+    "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
   ]
 }

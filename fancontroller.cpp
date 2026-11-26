@@ -40,7 +40,7 @@ bool FanController::begin() {
   bool success = true;
 
   Wire.begin(SdaPin, SclPin);
-  sensorReady = sht31.begin(0x44, &Wire);
+  sensorReady = sht31.begin(0x44);
   if (!sensorReady) {
     Serial.println("Fan controller: SHT31 sensor not found at 0x44");
     success = false;

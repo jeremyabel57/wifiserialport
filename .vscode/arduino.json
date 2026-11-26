@@ -3,7 +3,7 @@
   "port": "COM21",
   "configuration": "",
   "output": "build",
-  "board": "",
+  "board": "esp32:esp32:esp32s3",
   "programmer": "",
   "useProgrammer": false,
   "optimize_for_debug": false,
