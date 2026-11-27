@@ -8,7 +8,6 @@
 
 #include "config.h"             //
 #include "general.h"            // misc functions
-#include <AsyncHTTPRequest_Generic.h>                           // Async web requests   https://github.com/khoih-prog/AsyncHTTPRequest_Generic
 
 
 
@@ -494,13 +493,6 @@ void websrvc::loop() {
 
 
 
-void websrvc::loop_1s() {
-}
-
-
-
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // webser stream buffer functions
 
@@ -546,31 +538,3 @@ void webserc::loop() {
     web.ws->binaryAll(reinterpret_cast<const uint8_t *>(output), length);
   }
 }
-
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-// http client functions
-
-
-
-//        send - start a http request
-bool webreq::send(const char *url) {
-  if (request.readyState() == readyStateUnsent || request.readyState() == readyStateDone) {
-    if (request.open("GET", url)) {
-      request.send();
-      processed=false;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool webreq::received() { if (!processed) if (request.readyState()==readyStateDone) { processed=true; return true;}  return false; }          // true if http request complete - response received
-bool webreq::pending() { return (request.readyState() != readyStateUnsent) && (request.readyState() != readyStateDone); }                     // true if http request is pending
-String webreq::responseText() { return request.responseText(); }                                                                              // text of http response
-char *webreq::respHeaderValue(const char *var) { return request.respHeaderValue(var); }                                                       // return value of a given header from response
-

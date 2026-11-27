@@ -9,7 +9,6 @@
 /*
 
   web.begin();    // setup including AsyncFsWebServer
-  web.loop_1s();  // run every 1 second inside loop
 
 */
 
@@ -24,26 +23,6 @@
 #include <FS.h>                                 // AsyncFsWebServer (in place of ESP Essentials)
 #include <LittleFS.h>                           // LittleFS
 #include <AsyncFsWebServer.h>                   // AsyncFsWebServer (in place of ESP Essentials), this uses Async background operations
-#include <AsyncHTTPRequest_Generic.h>           // Async web requests   https://github.com/khoih-prog/AsyncHTTPRequest_Generic
-
-
-
-// client functions
-class webreq {
-  public:
-
-    AsyncHTTPRequest request;                         // async request object
-    bool processed = true;                            // use this to flag that even though readyStateDone, it has been processed, and ready for next request
-
-    bool send(const char*);                           // send http request.  return true if successful
-    bool received();                                  // returns true if response received from request.  Only returns true once, then sets processed flag so subsequent calls do not return true until next request is made.
-    bool pending();                                   // returns true if web request in process
-    String responseText();                            // return response text (if available)
-    char *respHeaderValue(const char *);              // return given header value
-} ;
-
-
-
 // serial queue buffer for web serial stream
 class webserc : public SerialQc {
   protected:
@@ -96,7 +75,6 @@ class websrvc {
     void setOpt(const char *lbl, const char *val);                    // set option by name
 
     void loop();                                                      // run every loop
-    void loop_1s();                                                   // run every second
 
 } ;
 

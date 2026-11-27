@@ -15,14 +15,6 @@
 
 
 
-// give the elapse between a and b, assuming b > a, and accounding for unsigned long roll-over
-unsigned long elapsems(unsigned long a, unsigned long b) {
-  if (a > b) return b - a;                                    // if confined to unsigned long, this probably works for both cases
-  else return (unsigned long)0xFFFFFFFF - (a - b) + 1;        //(unsigned long long) 0x100000000-(a-b);
-}
-
-
-
 /*        strfind
   task:   search a string
   in:     haystack = string being searched

@@ -41,7 +41,6 @@
 #endif                          //
 
 
-#include "general.h"            // misc functions
 #include "config.h"
 #include "sertie.h"             // serial tie between three clients (bt serial, web serial, and usb serial) and serial2 (the computer console)
 //   traffice from serial2 is passed along to all three clients, input from any client is passed on to serial2
@@ -49,15 +48,6 @@
 #include "web.h"                // WiFi web setup, FS, HTTP server, including a web page text terminal interface for the serial port
 #include "fancontroller.h"      // SHT31 temperature-based fan controller
 
-
-
-
-
-
-
-// timers for loop function
-unsigned int loopTimer;
-unsigned int loopTimer1s;
 
 
 
@@ -87,7 +77,6 @@ void setup() {
   sertie.begin();                                                                               // initialize the code that directs serial traffic between BT serial, web serial, USB serial and Serial2
 #endif
 
-  loopTimer1s = millis();
 }
 
 
@@ -112,18 +101,6 @@ void loop() {
   web.loop();
 #endif
   fanController.loop();  // temperature control and tachometer sampling
-
-  loopTimer = millis();
-
-  // execute once per second
-  if (elapsems(loopTimer1s, loopTimer) > 1000) {    // execute once per second
-    loopTimer1s = millis();
-
-#ifdef WEB_H
-    web.loop_1s();
-#endif
-  }
-
 
   yield();    // yield to RTOS and background processes
 }

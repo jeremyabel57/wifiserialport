@@ -8,7 +8,6 @@
 
 
 
-unsigned long elapsems(unsigned long a, unsigned long b);          // give the elapse between a and b, assuming b > a, and accounding for unsigned long roll-over
 char *strfind(char *haystack, const char *needle);                 // search for string needle within haystack
 char *strfind(char *haystack, char needle = '\n', uint8_t d = 0);  // search for a character within a string
 void delayus(unsigned long d = 1);                                 // delay for a given number of microseconds.  Using micros() timer, the first microsecond will be a partial microsecond delay.
