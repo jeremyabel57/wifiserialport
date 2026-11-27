@@ -55,6 +55,7 @@ class websrvc {
     static void root(AsyncWebServerRequest*);                         // root web page
     static void dstore(AsyncWebServerRequest*);                       // handle web option requests
     static void handleLed(AsyncWebServerRequest*);                    // switch LED on/off
+    static void status(AsyncWebServerRequest*);                       // return live fan and sensor status
 
     static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient*, AwsEventType, void*, uint8_t*, size_t);   // websocket handler
 

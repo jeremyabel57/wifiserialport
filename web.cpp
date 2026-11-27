@@ -8,25 +8,45 @@
 
 #include "config.h"             //
 #include "general.h"            // misc functions
+#include "fancontroller.h"      // temperature and fan speed readings
+#include <WiFi.h>
+#include <math.h>
 
 
+namespace {
+String htmlEscape(const String& value) {
+  String escaped;
+  escaped.reserve(value.length());
+  for (size_t i = 0; i < value.length(); i++) {
+    switch (value.charAt(i)) {
+      case '&': escaped += F("&amp;"); break;
+      case '<': escaped += F("&lt;"); break;
+      case '>': escaped += F("&gt;"); break;
+      case '"': escaped += F("&quot;"); break;
+      case '\'': escaped += F("&#39;"); break;
+      default: escaped += value.charAt(i); break;
+    }
+  }
+  return escaped;
+}
+}
 
 
 
 void websrvc::begin() {
 
-  server = new AsyncFsWebServer(LittleFS, 80, "");              // AsyncFsWebServer object
+  server = new AsyncFsWebServer(LittleFS, 80, "");                        // AsyncFsWebServer object
 
 
   // set configuration defaults
-  cfg.name = String("new");
+  cfg.name = String("new");                                               // default wifi ssid name 
 
   if (LittleFS.exists(server->getConfiFileName())) {                      // load option variables from config
     // Test "options" values
     server->getOptionValue("hostname", cfg.name);
   }
 
-  server->setHostname(cfg.name.c_str());        // set hostname
+  server->setHostname(cfg.name.c_str());                                  // set hostname
 
 
   captivePortal = !server->startWiFi(10000);                              // Try to connect to WiFi (will start AP if not connected after timeout)
@@ -50,6 +70,7 @@ void websrvc::begin() {
   server->on("/resetwifi", HTTP_GET, web.clearWifi);
   server->on("/reset", HTTP_GET, web.reset);
   server->on("/ds", HTTP_GET, web.dstore);
+  server->on("/status", HTTP_GET, web.status);
   server->on("/", HTTP_GET, web.root);
   //////////////////////////////////
 
@@ -118,10 +139,44 @@ void websrvc::clearWifi(AsyncWebServerRequest* request) {
 }
 
 
+void websrvc::status(AsyncWebServerRequest* request) {
+  const float temperature = fanController.temperatureC();
+  const float fanSpeed = fanController.fanSpeedPercent();
+  const float fanRpm = fanController.fanRpm();
+
+  char body[160];
+  if (isfinite(temperature)) {
+    snprintf(body, sizeof(body),
+             "{\"temperatureC\":%.1f,\"fanSpeedPercent\":%.0f,\"fanRpm\":%.0f}",
+             temperature, fanSpeed, fanRpm);
+  } else {
+    snprintf(body, sizeof(body),
+             "{\"temperatureC\":null,\"fanSpeedPercent\":%.0f,\"fanRpm\":%.0f}",
+             fanSpeed, fanRpm);
+  }
+
+  AsyncWebServerResponse *response =
+    request->beginResponse(200, "application/json", body);
+  response->addHeader("Cache-Control", "no-store");
+  request->send(response);
+}
+
+
 
 void websrvc::root(AsyncWebServerRequest* request) {
   AsyncResponseStream *response = request->beginResponseStream("text/html");
   response->addHeader("Server", "ESP Async Web Server");
+
+  String wifiSsid;
+  IPAddress wifiIp;
+  if (web.captivePortal) {
+    wifiSsid = String(cfg.name) + "_Serial";
+    wifiIp = WiFi.softAPIP();
+  } else {
+    wifiSsid = WiFi.SSID();
+    wifiIp = WiFi.localIP();
+  }
+
   response->print(F(R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
@@ -178,27 +233,6 @@ void websrvc::root(AsyncWebServerRequest* request) {
         margin-bottom: 15px;
       }
 
-      .input-area {
-        display: flex;
-        gap: 10px;
-      }
-
-      input[type="text"] {
-        flex: 1;
-        background-color: #1a1a1a;
-        border: 1px solid #00ff00;
-        color: #00ff00;
-        padding: 12px;
-        font-family: inherit;
-        font-size: 16px;
-        border-radius: 4px;
-        outline: none;
-      }
-
-      input[type="text"]:disabled {
-        opacity: 0.65;
-      }
-
       .system-msg {
         color: #888888;
         font-style: italic;
@@ -212,19 +246,24 @@ void websrvc::root(AsyncWebServerRequest* request) {
       MCU configuration: &nbsp;
       <a href="/setup" target="_blank" class="custom-link">setup</a>
       <a href="/edit" target="_blank" class="custom-link">edit</a>
+)rawliteral"));
+  response->print(F("&nbsp; <span>WiFi SSID: "));
+  response->print(htmlEscape(wifiSsid));
+  response->print(F("</span>&nbsp; <span>IP Address: "));
+  response->print(wifiIp.toString());
+  response->print(F("</span>&nbsp; <span>Temperature: <b id=\"temperatureStatus\">--</b></span>"
+                     "&nbsp; <span>Fan: <b id=\"fanStatus\">--</b></span>"));
+  response->print(F(R"rawliteral(
     </div>
     <div id="terminal"></div>
-    <div class="input-area">
-      <input type="text" id="cmdInput" placeholder="Connect, then type to send serial input..." autocomplete="off" disabled>
-    </div>
     <script>
       const terminal = document.getElementById('terminal');
-      const cmdInput = document.getElementById('cmdInput');
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
       let socket;
       let decoder = new TextDecoder();
       let pendingCarriageReturn = false;
+      let composing = false;
 
       const arrowKeys = {
         ArrowUp: 'A',
@@ -361,6 +400,23 @@ void websrvc::root(AsyncWebServerRequest* request) {
         return true;
       }
 
+      async function updateStatus() {
+        try {
+          const response = await fetch('/status', { cache: 'no-store' });
+          if (!response.ok) return;
+          const status = await response.json();
+          document.getElementById('temperatureStatus').textContent =
+            status.temperatureC === null
+              ? 'Sensor unavailable'
+              : `${status.temperatureC.toFixed(1)} C`;
+          document.getElementById('fanStatus').textContent =
+            `${status.fanSpeedPercent.toFixed(0)}% (${status.fanRpm.toFixed(0)} RPM)`;
+        } catch (_) {
+          document.getElementById('temperatureStatus').textContent = 'Unavailable';
+          document.getElementById('fanStatus').textContent = 'Unavailable';
+        }
+      }
+
       function initWebSocket() {
         if (socket && (socket.readyState === WebSocket.CONNECTING ||
                        socket.readyState === WebSocket.OPEN)) return;
@@ -370,8 +426,6 @@ void websrvc::root(AsyncWebServerRequest* request) {
         socket = new WebSocket(wsUrl);
         socket.binaryType = 'arraybuffer';
         socket.onopen = () => {
-          cmdInput.disabled = false;
-          cmdInput.focus();
           logSystem("Connection established!");
         };
         socket.onmessage = (event) => {
@@ -381,39 +435,39 @@ void websrvc::root(AsyncWebServerRequest* request) {
           appendSerialText(text);
         };
         socket.onclose = () => {
-          cmdInput.disabled = true;
           appendSerialText(decoder.decode());
           logSystem("Connection lost. Reconnecting in 3 seconds...");
           setTimeout(initWebSocket, 3000);
         };
       }
 
-      cmdInput.addEventListener('keydown', (e) => {
+      document.addEventListener('keydown', (e) => {
+        if (composing || document.hidden) return;
         const payload = keyPayload(e);
         if (payload !== null && sendInput(payload)) {
           e.preventDefault();
         }
       });
 
-      cmdInput.addEventListener('paste', (e) => {
+      document.addEventListener('paste', (e) => {
         const text = e.clipboardData && e.clipboardData.getData('text/plain');
         if (text && sendInput(text)) e.preventDefault();
       });
 
-      cmdInput.addEventListener('input', (e) => {
-        if (e.isComposing || !cmdInput.value) return;
-        if (sendInput(cmdInput.value)) cmdInput.value = '';
+      document.addEventListener('compositionstart', () => {
+        composing = true;
       });
 
-      cmdInput.addEventListener('compositionend', () => {
-        if (sendInput(cmdInput.value)) cmdInput.value = '';
+      document.addEventListener('compositionend', (e) => {
+        composing = false;
+        if (e.data) sendInput(e.data);
       });
 
-      terminal.addEventListener('click', () => {
-        if (!cmdInput.disabled) cmdInput.focus();
+      window.addEventListener('load', () => {
+        updateStatus();
+        setInterval(updateStatus, 1000);
+        initWebSocket();
       });
-
-      window.addEventListener('load', initWebSocket);
     </script>
   </body>
 </html>

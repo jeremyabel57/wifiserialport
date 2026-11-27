@@ -3,6 +3,7 @@
 
 #define BTSER_C
 #include "btserial.h"
+#include <BLEAdvertising.h>
 
 
 //  == == == == == == == == == == == == == == == == == == == == == == == == ==
@@ -12,6 +13,7 @@
 #define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+#define DEVICE_NAME "ESP32S3_Serial"
 
 
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -63,7 +65,7 @@ void btserc::begin() {
     abort();
   }
 
-  BLEDevice::init("ESP32S3_Serial");
+  BLEDevice::init(DEVICE_NAME);
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -78,8 +80,15 @@ void btserc::begin() {
                                          );
   pRxCharacteristic->setCallbacks(new MyCallbacks());
   pService->start();
-  pServer->getAdvertising()->addServiceUUID(SERVICE_UUID);
-  pServer->getAdvertising()->start();
+  BLEAdvertising *advertising = pServer->getAdvertising();
+  advertising->addServiceUUID(SERVICE_UUID);
+  advertising->setScanResponse(true);
+  BLEAdvertisementData scanResponse;
+  scanResponse.setName(DEVICE_NAME);
+  if (!advertising->setScanResponseData(scanResponse)) {
+    Serial.println(F("Failed to configure Bluetooth scan response"));
+  }
+  advertising->start();
 }
 
 
