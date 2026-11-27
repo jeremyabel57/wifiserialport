@@ -5,6 +5,9 @@
 #include <Wire.h>
 #include <math.h>
 #include <driver/pcnt.h>
+#include <AsyncFsWebServer.h>
+#include <Json.h>
+#include <LittleFS.h>
 
 #if __has_include(<esp_arduino_version.h>)
 #include <esp_arduino_version.h>
@@ -14,6 +17,30 @@ namespace {
 Adafruit_SHT31 sht31;
 const pcnt_unit_t TachPcntUnit = PCNT_UNIT_0;
 const unsigned long SampleIntervalMs = 1000;
+
+bool readStringOption(const cJSON *root, const char *label, String &value) {
+  const cJSON *sections = root ? cJSON_GetObjectItemCaseSensitive(root, "sections") : nullptr;
+  if (!sections || !cJSON_IsArray(sections)) return false;
+
+  for (const cJSON *section = sections->child; section; section = section->next) {
+    const cJSON *elements = cJSON_GetObjectItemCaseSensitive(section, "elements");
+    if (!elements || !cJSON_IsArray(elements)) continue;
+
+    for (const cJSON *element = elements->child; element; element = element->next) {
+      const cJSON *labelNode = cJSON_GetObjectItemCaseSensitive(element, "label");
+      if (!labelNode || !cJSON_IsString(labelNode) || !labelNode->valuestring ||
+          strcmp(labelNode->valuestring, label) != 0) {
+        continue;
+      }
+
+      const cJSON *valueNode = cJSON_GetObjectItemCaseSensitive(element, "value");
+      if (!valueNode || !cJSON_IsString(valueNode) || !valueNode->valuestring) return false;
+      value = valueNode->valuestring;
+      return true;
+    }
+  }
+  return false;
+}
 }
 
 FanController fanController;
@@ -30,14 +57,16 @@ FanController::FanController()
     currentTachFrequencyHz(0),
     currentFanRpm(0),
     currentFanSpeedPercent(100) {
-  curve[0] = {25.0f, 0.0f};
-  curve[1] = {35.0f, 30.0f};
+  curve[0] = {25.0f, 20.0f};
+  curve[1] = {35.0f, 40.0f};
   curve[2] = {45.0f, 65.0f};
-  curve[3] = {55.0f, 100.0f};
+  curve[3] = {55.0f, 90.0f};
 }
 
 bool FanController::begin() {
   bool success = true;
+
+  loadCurveFromConfig();
 
   Wire.begin(SdaPin, SclPin);
   sensorReady = sht31.begin(0x44);
@@ -87,6 +116,77 @@ bool FanController::begin() {
 
   lastSampleMs = millis();
   return success;
+}
+
+bool FanController::loadCurveFromConfig() {
+  if (!LittleFS.exists(ESP_FS_WS_CONFIG_FILE)) {
+    Serial.println("Fan controller: no saved curve configuration; using defaults");
+    return false;
+  }
+
+  File configFile = LittleFS.open(ESP_FS_WS_CONFIG_FILE, "r");
+  if (!configFile) {
+    Serial.println("Fan controller: unable to open curve configuration; using defaults");
+    return false;
+  }
+
+  const String configText = configFile.readString();
+  configFile.close();
+
+  CJSON::Json config;
+  if (!config.parse(configText)) {
+    Serial.println("Fan controller: invalid configuration JSON; using defaults");
+    return false;
+  }
+
+  String curveJson;
+  if (!readStringOption(config.getRoot(), "Fan curve JSON", curveJson)) {
+    Serial.println("Fan controller: saved curve not found; using defaults");
+    return false;
+  }
+
+  CJSON::Json curveConfig;
+  if (!curveConfig.parse(curveJson)) {
+    Serial.println("Fan controller: invalid fan curve JSON; using defaults");
+    return false;
+  }
+
+  const cJSON *points = curveConfig.getRoot();
+  const int pointCount = points && cJSON_IsArray(points) ? cJSON_GetArraySize(points) : 0;
+  if (pointCount < 2 || pointCount > MaxCurvePoints) {
+    Serial.println("Fan controller: fan curve must contain 2 to 8 points; using defaults");
+    return false;
+  }
+
+  CurvePoint configuredCurve[MaxCurvePoints];
+  for (int i = 0; i < pointCount; ++i) {
+    const cJSON *point = cJSON_GetArrayItem(points, i);
+    if (!point || !cJSON_IsArray(point) || cJSON_GetArraySize(point) != 2) {
+      Serial.println("Fan controller: each curve point must be [temperatureC, pwmPercent]; using defaults");
+      return false;
+    }
+
+    const cJSON *temperature = cJSON_GetArrayItem(point, 0);
+    const cJSON *pwmPercent = cJSON_GetArrayItem(point, 1);
+    if (!temperature || !cJSON_IsNumber(temperature) ||
+        !pwmPercent || !cJSON_IsNumber(pwmPercent)) {
+      Serial.println("Fan controller: curve point values must be numeric; using defaults");
+      return false;
+    }
+
+    configuredCurve[i] = {
+      static_cast<float>(temperature->valuedouble),
+      static_cast<float>(pwmPercent->valuedouble)
+    };
+  }
+
+  if (!setCurve(configuredCurve, static_cast<size_t>(pointCount))) {
+    Serial.println("Fan controller: invalid curve values; using defaults");
+    return false;
+  }
+
+  Serial.printf("Fan controller: loaded %d fan curve points from configuration\n", pointCount);
+  return true;
 }
 
 void FanController::loop() {

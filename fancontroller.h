@@ -45,6 +45,7 @@ class FanController {
     float currentFanRpm;
     float currentFanSpeedPercent;
 
+    bool loadCurveFromConfig();
     float pwmForTemperature(float temperature) const;
 };
 

@@ -9,7 +9,7 @@ Fan controller:
 . Connect the SHT31 SDA to GPIO1 and SCL to GPIO2 (default I2C address 0x44).
 . Connect the fan tachometer signal to GPIO4 and its PWM control to GPIO7.
 . The controller uses 25 kHz PWM, assumes two tach pulses per revolution, and starts with a 100% fan output as a fail-safe.
-. Default temperature/PWM points are 25 C/0%, 35 C/30%, 45 C/65%, and 55 C/100%. Replace them before `fanController.begin()` with a `FanController::CurvePoint` array of 2-8 points using `fanController.setCurve(points, count)`; temperatures must strictly increase and PWM percentages must be nondecreasing in the 0-100 range. Values between points are linearly interpolated and values outside the curve use the nearest endpoint.
+. The default temperature/PWM points are 25 C/20%, 35 C/40%, 45 C/65%, and 55 C/90%. Set the `Fan curve JSON` option on `/setup` to a JSON array of `[temperatureC, pwmPercent]` pairs (2-8 points); for example, `[[25,20],[35,40],[45,65],[55,90]]`. The saved curve is loaded during `fanController.begin()`; invalid or missing values leave the built-in defaults in place. Temperatures must strictly increase and PWM percentages must be nondecreasing in the 0-100 range. Values between points are linearly interpolated and values outside the curve use the nearest endpoint.
 . Call `fanController.setTachPulsesPerRevolution(...)` before `begin()` if the fan uses a different tach pulse count. Temperature, tach frequency, RPM, and applied PWM are available through the class getters.
 . Ensure the GPIO4 tach signal is level-shifted or pulled up to a safe 3.3 V logic level.
 

@@ -59,6 +59,12 @@ void websrvc::begin() {
   }                                                                       // end if
 
   // custom options
+  server->addOptionBox("Fan controller");
+  String fanCurve = F("[[25,20],[35,40],[45,65],[55,90]]");
+  server->addOption("Fan curve JSON", fanCurve);
+  server->addComment("Fan curve JSON",
+                     "JSON array of [temperature C, PWM percent] pairs; use 2 to 8 points.");
+
   server->addOptionBox("Custom options");
   server->addOption("hostname", cfg.name);
   server->setSetupPageTitle("Async ESP FS WebServer");                    // set main webpage title
