@@ -176,7 +176,6 @@ void websrvc::root(AsyncWebServerRequest* request) {
         padding: 15px;
         overflow-y: auto;
         white-space: pre-wrap;
-        /* Maintains spacing and inline flows */
         margin-bottom: 15px;
       }
 
@@ -197,6 +196,10 @@ void websrvc::root(AsyncWebServerRequest* request) {
         outline: none;
       }
 
+      input[type="text"]:disabled {
+        opacity: 0.65;
+      }
+
       .system-msg {
         color: #888888;
         font-style: italic;
@@ -213,13 +216,47 @@ void websrvc::root(AsyncWebServerRequest* request) {
     </div>
     <div id="terminal"></div>
     <div class="input-area">
-      <input type="text" id="cmdInput" placeholder="Type directly to stream keystrokes..." autocomplete="off">
+      <input type="text" id="cmdInput" placeholder="Connect, then type to send serial input..." autocomplete="off" disabled>
     </div>
     <script>
       const terminal = document.getElementById('terminal');
       const cmdInput = document.getElementById('cmdInput');
-      const wsUrl = `ws://${window.location.host}/ws`;
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
       let socket;
+      let decoder = new TextDecoder();
+      let pendingCarriageReturn = false;
+
+      const arrowKeys = {
+        ArrowUp: 'A',
+        ArrowDown: 'B',
+        ArrowRight: 'C',
+        ArrowLeft: 'D',
+        Home: 'H',
+        End: 'F'
+      };
+      const tildeKeys = {
+        Insert: 2,
+        Delete: 3,
+        PageUp: 5,
+        PageDown: 6
+      };
+      const functionKeys = {
+        F1: 'P',
+        F2: 'Q',
+        F3: 'R',
+        F4: 'S'
+      };
+      const numberedFunctionKeys = {
+        F5: 15,
+        F6: 17,
+        F7: 18,
+        F8: 19,
+        F9: 20,
+        F10: 21,
+        F11: 23,
+        F12: 24
+      };
 
       function logSystem(message) {
         const div = document.createElement('div');
@@ -229,55 +266,154 @@ void websrvc::root(AsyncWebServerRequest* request) {
         terminal.scrollTop = terminal.scrollHeight;
       }
 
-      function appendChar(char) {
-        // Convert newlines to block elements or linebreaks if necessary, 
-        // otherwise append raw text node for perfect inline alignment
-        if (char === '\r') return;
-        if (char === '\n') {
-          terminal.appendChild(document.createElement('br'));
-        } else {
-          const span = document.createTextNode(char);
-          terminal.appendChild(span);
+      function appendSerialText(text) {
+        if (pendingCarriageReturn && text.length > 0) {
+          if (text[0] === '\n') text = text.slice(1);
+          pendingCarriageReturn = false;
         }
+        if (!text) return;
+
+        const endsWithCarriageReturn = text.endsWith('\r');
+        if (endsWithCarriageReturn) {
+          text = text.slice(0, -1);
+          pendingCarriageReturn = true;
+        }
+        const displayText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n') +
+          (endsWithCarriageReturn ? '\n' : '');
+        if (!displayText) return;
+        terminal.appendChild(document.createTextNode(displayText));
         terminal.scrollTop = terminal.scrollHeight;
       }
 
+      function modifiedCsi(event, final) {
+        const modifier = 1 + (event.shiftKey ? 1 : 0) +
+          (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
+        return modifier === 1
+          ? `\x1b[${final}`
+          : `\x1b[1;${modifier}${final}`;
+      }
+
+      function controlCharacter(key) {
+        const normalizedKey = key.toLowerCase();
+        if (normalizedKey.length === 1 &&
+            normalizedKey >= 'a' && normalizedKey <= 'z') {
+          return String.fromCharCode(normalizedKey.charCodeAt(0) - 96);
+        }
+        const controlKeys = {
+          ' ': '\x00',
+          '@': '\x00',
+          '[': '\x1b',
+          '\\': '\x1c',
+          ']': '\x1d',
+          '^': '\x1e',
+          '_': '\x1f',
+          '?': '\x7f'
+        };
+        return Object.prototype.hasOwnProperty.call(controlKeys, key)
+          ? controlKeys[key]
+          : null;
+      }
+
+      function keyPayload(event) {
+        const key = event.key;
+        if (event.isComposing || key === 'Process' || event.metaKey) return null;
+
+        if (key === 'Enter') return '\r';
+        if (key === 'Backspace') return event.ctrlKey ? '\x17' : '\b';
+        if (key === 'Tab') return event.shiftKey ? '\x1b[Z' : '\t';
+        if (key === 'Escape') return '\x1b';
+
+        if (Object.prototype.hasOwnProperty.call(arrowKeys, key)) {
+          return modifiedCsi(event, arrowKeys[key]);
+        }
+        if (Object.prototype.hasOwnProperty.call(tildeKeys, key)) {
+          const modifier = 1 + (event.shiftKey ? 1 : 0) +
+            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
+          return modifier === 1
+            ? `\x1b[${tildeKeys[key]}~`
+            : `\x1b[${tildeKeys[key]};${modifier}~`;
+        }
+        if (Object.prototype.hasOwnProperty.call(functionKeys, key)) {
+          const modifier = 1 + (event.shiftKey ? 1 : 0) +
+            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
+          return modifier === 1
+            ? `\x1bO${functionKeys[key]}`
+            : `\x1b[1;${modifier}${functionKeys[key]}`;
+        }
+        if (Object.prototype.hasOwnProperty.call(numberedFunctionKeys, key)) {
+          const modifier = 1 + (event.shiftKey ? 1 : 0) +
+            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
+          return modifier === 1
+            ? `\x1b[${numberedFunctionKeys[key]}~`
+            : `\x1b[${numberedFunctionKeys[key]};${modifier}~`;
+        }
+
+        const altGraph = event.getModifierState &&
+          event.getModifierState('AltGraph');
+        if (event.ctrlKey && !altGraph) return controlCharacter(key);
+        if (key.length === 0 || Array.from(key).length !== 1) return null;
+        if (altGraph) return key;
+        return event.altKey ? `\x1b${key}` : key;
+      }
+
+      function sendInput(text) {
+        if (!text || !socket || socket.readyState !== WebSocket.OPEN) return false;
+        socket.send(text);
+        return true;
+      }
+
       function initWebSocket() {
+        if (socket && (socket.readyState === WebSocket.CONNECTING ||
+                       socket.readyState === WebSocket.OPEN)) return;
+        decoder = new TextDecoder();
+        pendingCarriageReturn = false;
         logSystem("Connecting to ESP32 WebSocket...");
         socket = new WebSocket(wsUrl);
-        socket.onopen = () => logSystem("Connection established!");
+        socket.binaryType = 'arraybuffer';
+        socket.onopen = () => {
+          cmdInput.disabled = false;
+          cmdInput.focus();
+          logSystem("Connection established!");
+        };
         socket.onmessage = (event) => {
-          // Handle stream data character by character or word fragments instantly
-          for (let i = 0; i < event.data.length; i++) {
-            appendChar(event.data[i]);
-          }
+          const text = typeof event.data === 'string'
+            ? event.data
+            : decoder.decode(new Uint8Array(event.data), { stream: true });
+          appendSerialText(text);
         };
         socket.onclose = () => {
+          cmdInput.disabled = true;
+          appendSerialText(decoder.decode());
           logSystem("Connection lost. Reconnecting in 3 seconds...");
           setTimeout(initWebSocket, 3000);
         };
       }
-      // Stream every single key change non-blocking
+
       cmdInput.addEventListener('keydown', (e) => {
-        if (!socket || socket.readyState !== WebSocket.OPEN) return;
-        let payload = "";
-        if (e.key.length === 1) {
-          payload = e.key; // Alpha-numeric/symbols
-        } else if (e.key === 'Enter') {
-          payload = "\n";
-        } else if (e.key === 'Backspace') {
-          payload = "\b"; // Standard backspace control character
-        }
-        if (payload !== "") {
-          socket.send(payload);
-          // Clear input box immediately if user hits Enter to start a clean line block
-          if (e.key === 'Enter') {
-            setTimeout(() => {
-              cmdInput.value = '';
-            }, 10);
-          }
+        const payload = keyPayload(e);
+        if (payload !== null && sendInput(payload)) {
+          e.preventDefault();
         }
       });
+
+      cmdInput.addEventListener('paste', (e) => {
+        const text = e.clipboardData && e.clipboardData.getData('text/plain');
+        if (text && sendInput(text)) e.preventDefault();
+      });
+
+      cmdInput.addEventListener('input', (e) => {
+        if (e.isComposing || !cmdInput.value) return;
+        if (sendInput(cmdInput.value)) cmdInput.value = '';
+      });
+
+      cmdInput.addEventListener('compositionend', () => {
+        if (sendInput(cmdInput.value)) cmdInput.value = '';
+      });
+
+      terminal.addEventListener('click', () => {
+        if (!cmdInput.disabled) cmdInput.focus();
+      });
+
       window.addEventListener('load', initWebSocket);
     </script>
   </body>
@@ -371,7 +507,7 @@ void websrvc::loop_1s() {
 
 
 void webserc::s_write(char c) {         // send a character to the web terminal
-  if (web.ws) web.ws->textAll(&c, 1);
+  if (web.ws) web.ws->binaryAll(reinterpret_cast<const uint8_t *>(&c), 1);
 }
 
 
@@ -403,8 +539,12 @@ char webserc::read() {
 }
 
 
-void webserc::loop() {  
-  flushout(256);
+void webserc::loop() {
+  char output[256];
+  uint16_t length = qout.read(output, static_cast<uint16_t>(sizeof(output)));
+  if (length && web.ws) {
+    web.ws->binaryAll(reinterpret_cast<const uint8_t *>(output), length);
+  }
 }
 
 

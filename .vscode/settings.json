@@ -73,6 +73,6 @@
   "arduino.additionalUrls": [
     "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
   ],
-  "vs-arduino.board": "esp32:esp32:esp32s3:PartitionScheme=min_spiffs",
+  "vs-arduino.board": "esp32:esp32:esp32s3:JTAGAdapter=default,PSRAM=disabled,FlashMode=qio,FlashSize=4M,LoopCore=1,EventsCore=1,USBMode=hwcdc,CDCOnBoot=cdc,MSCOnBoot=default,DFUOnBoot=default,UploadMode=default,PartitionScheme=min_spiffs,CPUFreq=240,UploadSpeed=921600,DebugLevel=none,EraseFlash=none,ZigbeeMode=default",
   "vs-arduino.boardName": "ESP32S3 Dev Module (1.9MB APP, OTA, 128KB SPIFFS)"
 }

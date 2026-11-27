@@ -27,26 +27,7 @@
 
 */
 
-/*
-   init reorder
-   serial.begin(115200)
-   initialize AsyncFsWebServer
-   get device name from options
-   set hostname in AsyncFsWebServer using device name
-   finish initializing AsyncFsWebServer
 
-   get device program type (outdoor thermometer, grandfather clock, network host) from datastore
-   initialize and execute accordingly
-      outdoor thermometer will have multiple instances, each instance reports its name and the data to the network host
-      one outdoor thermometer will upload its data to weather underground, use a special project name to identify this one (i.e. outdoor thermon 1)
-      grandfather clock reports its name, current date/time stamp, and temperature/enviornment data to the network host
-   network host
-      will also support distributing OTA to each client by continusouly ping them until they wake up and come online, then quickly upload OTA
-        if necessary, first disable client sleep mode, then OTA update, then reenable sleep
-      when receiving data, add date/time stamp to the data so when reported we can see the last update.
-      sync current date time stamp from GF clock.  if not available, then sync from internet
-
-*/
 
 
 
