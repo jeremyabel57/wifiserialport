@@ -93,7 +93,7 @@ class websrvc {
     void end();                                                       // flush LittleFS
 
     String getOpt(const char *lbl);                                   // get option by name
-    void setOpt(const char *lbl, char *val);                          // set option by name
+    void setOpt(const char *lbl, const char *val);                    // set option by name
 
     void loop();                                                      // run every loop
     void loop_1s();                                                   // run every second

@@ -72,5 +72,7 @@
   "arduino.commandPath": "",
   "arduino.additionalUrls": [
     "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
-  ]
+  ],
+  "vs-arduino.board": "esp32:esp32:esp32s3:PartitionScheme=min_spiffs",
+  "vs-arduino.boardName": "ESP32S3 Dev Module (1.9MB APP, OTA, 128KB SPIFFS)"
 }

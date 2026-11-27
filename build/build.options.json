@@ -1,0 +1,9 @@
+{
+  "additionalFiles": "..\\..\\..,..\\..\\..,..\\..\\..,..\\..\\..,..\\..,..\\..,..\\..\\..,..\\..\\..,..\\..\\..,..\\..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "",
+  "fqbn": "esp32:esp32:esp32s3:JTAGAdapter=default,PSRAM=disabled,FlashMode=qio,FlashSize=4M,LoopCore=1,EventsCore=1,USBMode=hwcdc,CDCOnBoot=cdc,MSCOnBoot=default,DFUOnBoot=default,UploadMode=default,PartitionScheme=min_spiffs,CPUFreq=240,UploadSpeed=921600,DebugLevel=none,EraseFlash=none,ZigbeeMode=default",
+  "hardwareFolders": "D:\\Users\\person\\AppData\\Local\\ArduinoCommunity\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.12,D:\\Users\\person\\AppData\\Local\\ArduinoCommunity\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.12",
+  "otherLibrariesFolders": "C:\\Users\\person\\Documents\\Arduino\\libraries",
+  "sketchLocation": "D:\\Users\\person\\Documents\\vs\\wifiserialport"
+}
