@@ -581,18 +581,25 @@ void websrvc::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, Aw
 #endif
     return;
   }
-  if (info->message_opcode != WS_TEXT) {
+  // Some library versions leave message_opcode unset on complete frames.
+  const uint8_t messageOpcode = info->message_opcode == WS_CONTINUATION
+                                  ? info->opcode
+                                  : info->message_opcode;
+  if (messageOpcode != WS_TEXT) {
 #if WEB_SERIAL_DIAGNOSTICS
-    Serial.printf("[WEB TRACE] Ignored non-text WebSocket frame opcode=%u\n",
-                  static_cast<unsigned>(info->message_opcode));
+    Serial.printf("[WEB TRACE] Ignored WebSocket frame message opcode=%u frame opcode=%u\n",
+                  static_cast<unsigned>(info->message_opcode),
+                  static_cast<unsigned>(info->opcode));
 #endif
     return;
   }
 
   const size_t received = webser.receive(data, len);
 #if WEB_SERIAL_DIAGNOSTICS
-  Serial.printf("[WEB TRACE] WebSocket RX client=%u bytes=%u queued=%u\n",
+  Serial.printf("[WEB TRACE] WebSocket RX client=%u message opcode=%u frame opcode=%u bytes=%u queued=%u\n",
                 client ? static_cast<unsigned>(client->id()) : 0U,
+                static_cast<unsigned>(info->message_opcode),
+                static_cast<unsigned>(info->opcode),
                 static_cast<unsigned>(len),
                 static_cast<unsigned>(received));
 #endif
