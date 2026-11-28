@@ -9,6 +9,7 @@
 #include "config.h"             //
 #include "general.h"            // misc functions
 #include "fancontroller.h"      // temperature and fan speed readings
+#include "xterm_assets.h"
 #include <WiFi.h>
 #include <math.h>
 
@@ -78,6 +79,21 @@ void websrvc::begin() {
   server->on("/ds", HTTP_GET, web.dstore);
   server->on("/status", HTTP_GET, web.status);
   server->on("/", HTTP_GET, web.root);
+  server->on("/xterm.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse_P(
+      200, "application/javascript",
+      reinterpret_cast<const uint8_t *>(xtermJsGzip), xtermJsGzipLength);
+    response->addHeader("Content-Encoding", "gzip");
+    response->addHeader("Cache-Control", "no-cache");
+    request->send(response);
+  });
+  server->on("/xterm.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse_P(
+      200, "text/css; charset=utf-8",
+      reinterpret_cast<const uint8_t *>(xtermCss), xtermCssLength);
+    response->addHeader("Cache-Control", "no-cache");
+    request->send(response);
+  });
   //////////////////////////////////
 
   ws = new AsyncWebSocket("/ws");                 // configure websocket handler
@@ -190,11 +206,12 @@ void websrvc::root(AsyncWebServerRequest* request) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Real-Time Serial Terminal</title>
+    <link rel="stylesheet" href="/xterm.css">
     <style>
       body {
-        background-color: #121212;
-        color: #00ff00;
-        font-family: 'Courier New', Courier, monospace;
+        background-color: #000000;
+        color: #c0c0c0;
+        font-family: Consolas, 'Courier New', monospace;
         margin: 20px;
         display: flex;
         flex-direction: column;
@@ -202,7 +219,7 @@ void websrvc::root(AsyncWebServerRequest* request) {
       }
 
       h2 {
-        color: #ffffff;
+        color: #c0c0c0;
         margin-bottom: 5px;
       }
 
@@ -230,19 +247,18 @@ void websrvc::root(AsyncWebServerRequest* request) {
 
       #terminal {
         flex: 1;
+        min-height: 0;
+        position: relative;
         background-color: #000000;
         border: 2px solid #333;
         border-radius: 5px;
-        padding: 15px;
-        overflow-y: auto;
-        white-space: pre-wrap;
         margin-bottom: 15px;
       }
 
-      .system-msg {
-        color: #888888;
-        font-style: italic;
-        display: block;
+      #terminal .xterm {
+        height: 100%;
+        padding: 8px;
+        box-sizing: border-box;
       }
     </style>
   </head>
@@ -262,147 +278,37 @@ void websrvc::root(AsyncWebServerRequest* request) {
   response->print(F(R"rawliteral(
     </div>
     <div id="terminal"></div>
+    <script src="/xterm.js"></script>
     <script>
-      const terminal = document.getElementById('terminal');
+      const terminalElement = document.getElementById('terminal');
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
       const diagnostics = true;
       let socket;
-      let decoder = new TextDecoder();
-      let pendingCarriageReturn = false;
-      let composing = false;
+      const terminal = new Terminal({
+        cols: 80,
+        rows: 24,
+        convertEol: true,
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Consolas, "Courier New", monospace',
+        scrollback: 1000,
+        theme: {
+          background: '#000000',
+          foreground: '#c0c0c0',
+          cursor: '#c0c0c0',
+          selectionBackground: '#555555'
+        }
+      });
+      terminal.open(terminalElement);
+      terminal.focus();
 
       function logDiagnostic(message) {
         if (diagnostics) console.info(`[webserial] ${message}`);
       }
 
-      const arrowKeys = {
-        ArrowUp: 'A',
-        ArrowDown: 'B',
-        ArrowRight: 'C',
-        ArrowLeft: 'D',
-        Home: 'H',
-        End: 'F'
-      };
-      const tildeKeys = {
-        Insert: 2,
-        Delete: 3,
-        PageUp: 5,
-        PageDown: 6
-      };
-      const functionKeys = {
-        F1: 'P',
-        F2: 'Q',
-        F3: 'R',
-        F4: 'S'
-      };
-      const numberedFunctionKeys = {
-        F5: 15,
-        F6: 17,
-        F7: 18,
-        F8: 19,
-        F9: 20,
-        F10: 21,
-        F11: 23,
-        F12: 24
-      };
-
       function logSystem(message) {
-        const div = document.createElement('div');
-        div.className = 'system-msg';
-        div.textContent = message;
-        terminal.appendChild(div);
-        terminal.scrollTop = terminal.scrollHeight;
-      }
-
-      function appendSerialText(text) {
-        if (pendingCarriageReturn && text.length > 0) {
-          if (text[0] === '\n') text = text.slice(1);
-          pendingCarriageReturn = false;
-        }
-        if (!text) return;
-
-        const endsWithCarriageReturn = text.endsWith('\r');
-        if (endsWithCarriageReturn) {
-          text = text.slice(0, -1);
-          pendingCarriageReturn = true;
-        }
-        const displayText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n') +
-          (endsWithCarriageReturn ? '\n' : '');
-        if (!displayText) return;
-        terminal.appendChild(document.createTextNode(displayText));
-        terminal.scrollTop = terminal.scrollHeight;
-      }
-
-      function modifiedCsi(event, final) {
-        const modifier = 1 + (event.shiftKey ? 1 : 0) +
-          (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
-        return modifier === 1
-          ? `\x1b[${final}`
-          : `\x1b[1;${modifier}${final}`;
-      }
-
-      function controlCharacter(key) {
-        const normalizedKey = key.toLowerCase();
-        if (normalizedKey.length === 1 &&
-            normalizedKey >= 'a' && normalizedKey <= 'z') {
-          return String.fromCharCode(normalizedKey.charCodeAt(0) - 96);
-        }
-        const controlKeys = {
-          ' ': '\x00',
-          '@': '\x00',
-          '[': '\x1b',
-          '\\': '\x1c',
-          ']': '\x1d',
-          '^': '\x1e',
-          '_': '\x1f',
-          '?': '\x7f'
-        };
-        return Object.prototype.hasOwnProperty.call(controlKeys, key)
-          ? controlKeys[key]
-          : null;
-      }
-
-      function keyPayload(event) {
-        const key = event.key;
-        if (event.isComposing || key === 'Process' || event.metaKey) return null;
-
-        if (key === 'Enter') return '\r';
-        if (key === 'Backspace') return event.ctrlKey ? '\x17' : '\b';
-        if (key === 'Tab') return event.shiftKey ? '\x1b[Z' : '\t';
-        if (key === 'Escape') return '\x1b';
-
-        if (Object.prototype.hasOwnProperty.call(arrowKeys, key)) {
-          return modifiedCsi(event, arrowKeys[key]);
-        }
-        if (Object.prototype.hasOwnProperty.call(tildeKeys, key)) {
-          const modifier = 1 + (event.shiftKey ? 1 : 0) +
-            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
-          return modifier === 1
-            ? `\x1b[${tildeKeys[key]}~`
-            : `\x1b[${tildeKeys[key]};${modifier}~`;
-        }
-        if (Object.prototype.hasOwnProperty.call(functionKeys, key)) {
-          const modifier = 1 + (event.shiftKey ? 1 : 0) +
-            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
-          return modifier === 1
-            ? `\x1bO${functionKeys[key]}`
-            : `\x1b[1;${modifier}${functionKeys[key]}`;
-        }
-        if (Object.prototype.hasOwnProperty.call(numberedFunctionKeys, key)) {
-          const modifier = 1 + (event.shiftKey ? 1 : 0) +
-            (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
-          return modifier === 1
-            ? `\x1b[${numberedFunctionKeys[key]}~`
-            : `\x1b[${numberedFunctionKeys[key]};${modifier}~`;
-        }
-
-        const altGraph = event.getModifierState &&
-          event.getModifierState('AltGraph');
-        if (event.ctrlKey && !altGraph) return controlCharacter(key);
-        if (key.length === 0 || Array.from(key).length !== 1) return null;
-        if (altGraph) return key;
-        return event.altKey ? `\x1b${key}` : key;
+        terminal.write(`\r\n\x1b[90m[system] ${message}\x1b[0m\r\n`);
       }
 
       function sendInput(text) {
@@ -415,6 +321,19 @@ void websrvc::root(AsyncWebServerRequest* request) {
         logDiagnostic(`TX ${new TextEncoder().encode(text).length} byte(s)`);
         return true;
       }
+
+      function sendBinaryInput(data) {
+        if (!data || !socket || socket.readyState !== WebSocket.OPEN) {
+          logDiagnostic(`binary TX blocked; WebSocket state=${socket ? socket.readyState : 'uninitialized'}`);
+          return;
+        }
+        const bytes = Uint8Array.from(data, character => character.charCodeAt(0));
+        socket.send(bytes);
+        logDiagnostic(`binary TX ${bytes.length} byte(s)`);
+      }
+
+      terminal.onData(sendInput);
+      terminal.onBinary(sendBinaryInput);
 
       async function updateStatus() {
         try {
@@ -436,8 +355,6 @@ void websrvc::root(AsyncWebServerRequest* request) {
       function initWebSocket() {
         if (socket && (socket.readyState === WebSocket.CONNECTING ||
                        socket.readyState === WebSocket.OPEN)) return;
-        decoder = new TextDecoder();
-        pendingCarriageReturn = false;
         logSystem("Connecting to ESP32 WebSocket...");
         socket = new WebSocket(wsUrl);
         socket.binaryType = 'arraybuffer';
@@ -450,48 +367,19 @@ void websrvc::root(AsyncWebServerRequest* request) {
             ? new TextEncoder().encode(event.data).length
             : event.data.byteLength;
           logDiagnostic(`RX ${receivedBytes} byte(s)`);
-          const text = typeof event.data === 'string'
+          terminal.write(typeof event.data === 'string'
             ? event.data
-            : decoder.decode(new Uint8Array(event.data), { stream: true });
-          appendSerialText(text);
+            : new Uint8Array(event.data));
         };
         socket.onerror = () => {
           logDiagnostic('WebSocket error');
         };
         socket.onclose = () => {
           logDiagnostic('WebSocket closed');
-          appendSerialText(decoder.decode());
           logSystem("Connection lost. Reconnecting in 3 seconds...");
           setTimeout(initWebSocket, 3000);
         };
       }
-
-      document.addEventListener('keydown', (e) => {
-        if (composing || document.hidden) {
-          logDiagnostic('key ignored while composing text or page is hidden');
-          return;
-        }
-        const payload = keyPayload(e);
-        if (payload === null) {
-          logDiagnostic('key ignored because it has no terminal mapping');
-          return;
-        }
-        if (sendInput(payload)) e.preventDefault();
-      });
-
-      document.addEventListener('paste', (e) => {
-        const text = e.clipboardData && e.clipboardData.getData('text/plain');
-        if (text && sendInput(text)) e.preventDefault();
-      });
-
-      document.addEventListener('compositionstart', () => {
-        composing = true;
-      });
-
-      document.addEventListener('compositionend', (e) => {
-        composing = false;
-        if (e.data) sendInput(e.data);
-      });
 
       window.addEventListener('load', () => {
         updateStatus();
@@ -585,7 +473,7 @@ void websrvc::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, Aw
   const uint8_t messageOpcode = info->message_opcode == WS_CONTINUATION
                                   ? info->opcode
                                   : info->message_opcode;
-  if (messageOpcode != WS_TEXT) {
+  if (messageOpcode != WS_TEXT && messageOpcode != WS_BINARY) {
 #if WEB_SERIAL_DIAGNOSTICS
     Serial.printf("[WEB TRACE] Ignored WebSocket frame message opcode=%u frame opcode=%u\n",
                   static_cast<unsigned>(info->message_opcode),

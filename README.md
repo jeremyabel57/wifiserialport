@@ -23,8 +23,8 @@ goal:
 . the main serial connection via usb is "Serial"
 . add a BLE connection to emulate a serial port - this object is "btser". It advertises as `esp32ser` and exposes the Nordic UART Service (NUS) over BLE GATT.
   Use a BLE terminal client that supports NUS; this is not Bluetooth Classic SPP and does not create a Windows COM port for PuTTY or KiTTY.
-. add a WiFi connection, called "webser".  This will serve a webpage with terminal emulator javascript code that uses websockets to send keystrokes/text
-  back and forth.
+. add a WiFi connection, called "webser". Its web terminal uses xterm.js 6.0.0 for ANSI/xterm-compatible terminal emulation and sends input/output over WebSockets.
+  The gzip-compressed library is embedded in firmware and served locally, so the terminal works offline in the ESP32 access-point mode. The terminal defaults to grey text on black.
 . All 4 serial objects (Serial, Serial2, btser, webser) use the SerialQ class as a queue buffer.
 . Serial2 is the 'server' port, the other 3 are the 'client' ports
 . sertie class ties them together:
