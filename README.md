@@ -21,8 +21,8 @@ goal:
   For example, any linux, arm based router/nas/... box that uses the uart as its access to its boot console (uboot and later linux login).
   This connection is "Serial2"
 . the main serial connection via usb is "Serial"
-. add a BLE connection to emulate a serial port - this object is "btser".  This will give a cell phone or computer with BT the ability to
-  access it and connect a serial terminal to it (i.e. PuTTY or KiTTY)
+. add a BLE connection to emulate a serial port - this object is "btser". It advertises as `esp32ser` and exposes the Nordic UART Service (NUS) over BLE GATT.
+  Use a BLE terminal client that supports NUS; this is not Bluetooth Classic SPP and does not create a Windows COM port for PuTTY or KiTTY.
 . add a WiFi connection, called "webser".  This will serve a webpage with terminal emulator javascript code that uses websockets to send keystrokes/text
   back and forth.
 . All 4 serial objects (Serial, Serial2, btser, webser) use the SerialQ class as a queue buffer.

@@ -13,7 +13,7 @@
 #define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
-#define DEVICE_NAME "ESP32S3_Serial"
+#define DEVICE_NAME "esp32ser"
 
 
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -83,11 +83,9 @@ void btserc::begin() {
   BLEAdvertising *advertising = pServer->getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
   advertising->setScanResponse(true);
-  BLEAdvertisementData scanResponse;
-  scanResponse.setName(DEVICE_NAME);
-  if (!advertising->setScanResponseData(scanResponse)) {
-    Serial.println(F("Failed to configure Bluetooth scan response"));
-  }
+  // Keep the 8-character name short enough to fit with the 128-bit service UUID.
+  advertising->setMinPreferred(0x06);
+  advertising->setMaxPreferred(0x12);
   advertising->start();
 }
 
@@ -169,7 +167,7 @@ char btserc::read() {
 
   Steps to connect:
   1. Open the app and scan via the BLE tab.
-  2. Connect to "ESP32S3_Serial".
+  2. Connect to "esp32ser".
   3. Open your Arduino IDE Serial Monitor (115200 baud).
   4. Send text back and forth between the app terminal and your PC Serial Monitor.
 */
