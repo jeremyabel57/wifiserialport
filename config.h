@@ -5,6 +5,10 @@
 //#include <string.h>             // strings
 #include <inttypes.h>           // int types
 
+#ifndef WEB_SERIAL_DIAGNOSTICS
+#define WEB_SERIAL_DIAGNOSTICS 1
+#endif
+
 #ifndef LEDPIN
 #define LEDPIN 48
 #endif

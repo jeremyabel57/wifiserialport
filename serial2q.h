@@ -21,9 +21,16 @@
 #include "serialq.h"                            //
 
 
+class Serial2Qc : public SerialQc {
+  protected:
+    void s_write(char c) override;
+
+  public:
+    void loop();
+};
 
 #ifndef SERIAL2Q_C
-extern class SerialQc Serial2Q;  // serial interface object
+extern class Serial2Qc Serial2Q;  // serial interface object
 #endif
 
 

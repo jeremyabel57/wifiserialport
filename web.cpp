@@ -266,10 +266,15 @@ void websrvc::root(AsyncWebServerRequest* request) {
       const terminal = document.getElementById('terminal');
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+      const diagnostics = true;
       let socket;
       let decoder = new TextDecoder();
       let pendingCarriageReturn = false;
       let composing = false;
+
+      function logDiagnostic(message) {
+        if (diagnostics) console.info(`[webserial] ${message}`);
+      }
 
       const arrowKeys = {
         ArrowUp: 'A',
@@ -401,8 +406,13 @@ void websrvc::root(AsyncWebServerRequest* request) {
       }
 
       function sendInput(text) {
-        if (!text || !socket || socket.readyState !== WebSocket.OPEN) return false;
+        if (!text) return false;
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          logDiagnostic(`TX blocked; WebSocket state=${socket ? socket.readyState : 'uninitialized'}`);
+          return false;
+        }
         socket.send(text);
+        logDiagnostic(`TX ${new TextEncoder().encode(text).length} byte(s)`);
         return true;
       }
 
@@ -432,15 +442,24 @@ void websrvc::root(AsyncWebServerRequest* request) {
         socket = new WebSocket(wsUrl);
         socket.binaryType = 'arraybuffer';
         socket.onopen = () => {
+          logDiagnostic('WebSocket connected');
           logSystem("Connection established!");
         };
         socket.onmessage = (event) => {
+          const receivedBytes = typeof event.data === 'string'
+            ? new TextEncoder().encode(event.data).length
+            : event.data.byteLength;
+          logDiagnostic(`RX ${receivedBytes} byte(s)`);
           const text = typeof event.data === 'string'
             ? event.data
             : decoder.decode(new Uint8Array(event.data), { stream: true });
           appendSerialText(text);
         };
+        socket.onerror = () => {
+          logDiagnostic('WebSocket error');
+        };
         socket.onclose = () => {
+          logDiagnostic('WebSocket closed');
           appendSerialText(decoder.decode());
           logSystem("Connection lost. Reconnecting in 3 seconds...");
           setTimeout(initWebSocket, 3000);
@@ -448,11 +467,16 @@ void websrvc::root(AsyncWebServerRequest* request) {
       }
 
       document.addEventListener('keydown', (e) => {
-        if (composing || document.hidden) return;
-        const payload = keyPayload(e);
-        if (payload !== null && sendInput(payload)) {
-          e.preventDefault();
+        if (composing || document.hidden) {
+          logDiagnostic('key ignored while composing text or page is hidden');
+          return;
         }
+        const payload = keyPayload(e);
+        if (payload === null) {
+          logDiagnostic('key ignored because it has no terminal mapping');
+          return;
+        }
+        if (sendInput(payload)) e.preventDefault();
       });
 
       document.addEventListener('paste', (e) => {
@@ -534,16 +558,48 @@ void websrvc::setOpt(const char *lbl, const char *val) {                    // s
 // WebSocket event handler for incoming data from the browser
 void websrvc::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
                void *arg, uint8_t *data, size_t len) {
-    if (type == WS_EVT_DATA) {
-        AwsFrameInfo *info = static_cast<AwsFrameInfo *>(arg);
-        if (info && info->message_opcode == WS_TEXT) {
-            size_t received = webser.receive(data, len);
-            if (received < len) {
-                Serial.printf("Web serial RX queue full; dropped %u byte(s)\n",
-                              static_cast<unsigned>(len - received));
-            }
-        }
-    }
+  if (type == WS_EVT_CONNECT) {
+#if WEB_SERIAL_DIAGNOSTICS
+    Serial.printf("[WEB TRACE] WebSocket client %u connected\n",
+                  client ? static_cast<unsigned>(client->id()) : 0U);
+#endif
+    return;
+  }
+  if (type == WS_EVT_DISCONNECT) {
+#if WEB_SERIAL_DIAGNOSTICS
+    Serial.printf("[WEB TRACE] WebSocket client %u disconnected\n",
+                  client ? static_cast<unsigned>(client->id()) : 0U);
+#endif
+    return;
+  }
+  if (type != WS_EVT_DATA) return;
+
+  AwsFrameInfo *info = static_cast<AwsFrameInfo *>(arg);
+  if (!info) {
+#if WEB_SERIAL_DIAGNOSTICS
+    Serial.println(F("[WEB TRACE] WebSocket data event has no frame info"));
+#endif
+    return;
+  }
+  if (info->message_opcode != WS_TEXT) {
+#if WEB_SERIAL_DIAGNOSTICS
+    Serial.printf("[WEB TRACE] Ignored non-text WebSocket frame opcode=%u\n",
+                  static_cast<unsigned>(info->message_opcode));
+#endif
+    return;
+  }
+
+  const size_t received = webser.receive(data, len);
+#if WEB_SERIAL_DIAGNOSTICS
+  Serial.printf("[WEB TRACE] WebSocket RX client=%u bytes=%u queued=%u\n",
+                client ? static_cast<unsigned>(client->id()) : 0U,
+                static_cast<unsigned>(len),
+                static_cast<unsigned>(received));
+#endif
+  if (received < len) {
+    Serial.printf("Web serial RX queue full; dropped %u byte(s)\n",
+                  static_cast<unsigned>(len - received));
+  }
 }
 
 
@@ -592,9 +648,47 @@ char webserc::read() {
 
 
 void webserc::loop() {
+#if WEB_SERIAL_DIAGNOSTICS
+  static uint32_t queuedBytes = 0;
+  static uint32_t partialBytes = 0;
+  static uint32_t discardedBytes = 0;
+  static uint32_t lastReport = 0;
+#endif
+
   char output[256];
   uint16_t length = qout.read(output, static_cast<uint16_t>(sizeof(output)));
-  if (length && web.ws) {
-    web.ws->binaryAll(reinterpret_cast<const uint8_t *>(output), length);
+  if (length) {
+    if (web.ws) {
+      const AsyncWebSocket::SendStatus status =
+        web.ws->binaryAll(reinterpret_cast<const uint8_t *>(output), length);
+#if WEB_SERIAL_DIAGNOSTICS
+      if (status == AsyncWebSocket::ENQUEUED) {
+        queuedBytes += length;
+      } else if (status == AsyncWebSocket::PARTIALLY_ENQUEUED) {
+        partialBytes += length;
+      } else {
+        discardedBytes += length;
+      }
+#endif
+    } else {
+#if WEB_SERIAL_DIAGNOSTICS
+      discardedBytes += length;
+#endif
+    }
   }
+
+#if WEB_SERIAL_DIAGNOSTICS
+  const uint32_t now = millis();
+  if (now - lastReport >= 1000) {
+    Serial.printf("[WEB TRACE] WebSocket TX clients=%u queued=%lu partial=%lu discarded=%lu bytes/s\n",
+                  web.ws ? static_cast<unsigned>(web.ws->count()) : 0U,
+                  static_cast<unsigned long>(queuedBytes),
+                  static_cast<unsigned long>(partialBytes),
+                  static_cast<unsigned long>(discardedBytes));
+    queuedBytes = 0;
+    partialBytes = 0;
+    discardedBytes = 0;
+    lastReport = now;
+  }
+#endif
 }
